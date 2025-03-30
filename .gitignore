@@ -1,0 +1,11 @@
+# Ignore the "test images" directory
+test images/
+
+# Ignore the "training-set" directory
+training-set/
+
+# Ignore all PDF files
+*.pdf
+
+# Ignore atlas label files
+atlas_label_*.nii.gz

@@ -4,23 +4,24 @@ import numpy as np
 from tqdm import tqdm
 import matplotlib.pyplot as plt
 import nibabel as nib
+from preprocessing import rescale_intensity
 
 
-def getProbability(tissueModel, intensity, label):
+def getProbabilities(tissueModel, intensity):
     assert (
-        isinstance(intensity, int)
-        and tissueModel.shape[1] > intensity
+        tissueModel.shape[1] > intensity
         and intensity >= 0
-    ), "Invalid intensity value"
+    ), f"Invalid intensity value {intensity}"
 
-    assert (
-        isinstance(label, int) and tissueModel.shape[0] > label and label >= 0
-    ), "Invalid label value"
+    # print(intensity)
+    # print(type(intensity))
+    # print(tissueModel.shape)
+    # print(tissueModel[...][intensity])
 
-    return tissueModel[label, intensity]
+    return tissueModel[ : , intensity]
 
 
-def buildTissueModel(image_dir, mask_dir):
+def buildTissueModel(image_dir, mask_dir, save = True):
     # Get sorted filenames
     image_files = sorted([f for f in os.listdir(image_dir) if f.endswith(".nii.gz")])
     mask_files = sorted([f for f in os.listdir(mask_dir) if f.endswith(".nii.gz")])
@@ -41,22 +42,13 @@ def buildTissueModel(image_dir, mask_dir):
         desc="Building tissue model",
     ):
         # Load image and mask
-        image = itk.array_from_image(
+        image = itk.array_from_image(rescale_intensity(
             itk.imread(os.path.join(image_dir, img_file), itk.F)
-        )
+        ))
         mask = itk.array_from_image(
             itk.imread(os.path.join(mask_dir, mask_file), itk.UC)
         )
-
-        # Normalize to 0-255 range and convert to uint8
-        # TODO this is not smart, it adds distorsion of the intesities when max value is not max possible value across all images
-        image_min = np.min(image)
-        image_max = np.max(image)
-        image = ((image - image_min) * (255.0 / (image_max - image_min))).astype(
-            np.uint8
-        )
-        print(image_max, image_min)
-
+        
         # Count occurrences of each intensity-label pair
         for label in range(num_labels):
             mask_binary = mask == label
@@ -73,7 +65,8 @@ def buildTissueModel(image_dir, mask_dir):
     tissue_model = intensity_label_counts / total_counts
 
     # Save the tissue model
-    np.save("tissue_model.npy", tissue_model)
+    if save:
+        np.save(os.path.join("results", "tissue_model.npy"), tissue_model)
 
     return tissue_model
 
@@ -83,8 +76,6 @@ if __name__ == "__main__":
     model = buildTissueModel(
         "training-set/training-images", "training-set/training-labels"
     )
-
-    print(getProbability(model, 30, 1))
 
     # Visualize the tissue model
     plt.figure(figsize=(12, 8))

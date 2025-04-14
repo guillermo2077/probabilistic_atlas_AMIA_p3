@@ -4,6 +4,9 @@ test images/
 # Ignore the "training-set" directory
 training-set/
 
+# Ignore the "results" directory
+results/
+
 # Ignore all PDF files
 *.pdf
 

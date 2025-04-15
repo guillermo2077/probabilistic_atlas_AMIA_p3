@@ -10,7 +10,7 @@ def one_hot_encode_labels(label_array, num_classes=4):
         one_hot[..., i] = (label_array == i).astype(np.float32)
     return one_hot
 
-def buildProbabilisticAtlas(image_dir, label_dir, parameter_file_path, save = True):
+def buildProbabilisticAtlas(image_dir, label_dir, parameter_file_path, save_dir=None):
     # Get sorted filenames
     image_files = sorted([f for f in os.listdir(image_dir) if f.endswith(".nii.gz")])
     label_files = sorted([f for f in os.listdir(label_dir) if f.endswith(".nii.gz")])
@@ -50,10 +50,10 @@ def buildProbabilisticAtlas(image_dir, label_dir, parameter_file_path, save = Tr
     result = result / len(image_files)
 
     # result is shape (Z, Y, X, C) — split and save each channel
-    if save:
+    if save_dir is not None:
         for i in range(result.shape[-1]):
             channel_img = itk.image_from_array(result[..., i])
-            itk.imwrite(channel_img, os.path.join("results", f"atlas_label_{i}.nii.gz"))
+            itk.imwrite(channel_img, os.path.join(save_dir, f"atlas_label_{i}.nii.gz"))
 
     return result
 

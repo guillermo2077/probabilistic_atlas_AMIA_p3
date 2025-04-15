@@ -10,48 +10,50 @@ from preprocessing import rescale_intensity
 class BayesianPredictor:
     def __init__(self, refereceImage, parameterPath, training_dir=None, model_dir=None):
         self.refereceImage = rescale_intensity(itk.imread(refereceImage, itk.F))
-        self.training_dir = training_dir
-        self.model_dir = model_dir
         self.parameter_object = itk.ParameterObject.New()
         self.parameter_object.AddParameterFile(parameterPath)
         self.parameter_object.SetParameter(0, "WriteResultImage", "true")
 
         assert (
-            self.training_dir is not None or self.model_dir is not None
+            training_dir is not None or model_dir is not None
         ), "Either training_dir or model_dir must be provided"
 
-        self.train()
+        self.train(training_dir, model_dir)
 
-    def train(self):
-        if self.training_dir is not None:
+    def train(self, training_dir, model_dir):
+        if training_dir is not None:
             self.atlasModel = buildProbabilisticAtlas(
-                os.path.join(self.training_dir, "training-images"),
-                os.path.join(self.training_dir, "training-labels"),
+                os.path.join(training_dir, "training-images"),
+                os.path.join(training_dir, "training-labels"),
                 "Par0010/Par0010affine.txt",
+                save_dir="results",
             )
             self.tissueModel = buildTissueModel(
-                os.path.join(self.training_dir, "training-images"),
-                os.path.join(self.training_dir, "training-labels"),
+                os.path.join(training_dir, "training-images"),
+                os.path.join(training_dir, "training-labels"),
             )
-        elif self.model_dir is not None:
+        elif model_dir is not None:
             self.atlasModel = loadModel(
                 [
-                    os.path.join(self.model_dir, f"atlas_label_{i+1}.nii.gz")
+                    os.path.join(model_dir, f"atlas_label_{i}.nii.gz")
                     for i in range(4)
                 ]
             )
-            self.tissueModel = np.load(os.path.join(self.model_dir, "tissue_model.npy"))
+            self.tissueModel = np.load(os.path.join(model_dir, "tissue_model.npy"))
 
-    def inference(self, image_path, save=True):
+    def inference(self, image_path, save_path=None, skip_prediction= False):
         image = rescale_intensity(itk.imread(image_path, itk.F))
         result = np.zeros((image.shape[0], image.shape[1], image.shape[2]))
 
-        image, _ = itk.elastix_registration_method(
+        image, transform = itk.elastix_registration_method(
             self.refereceImage,
             image,
             parameter_object=self.parameter_object,
             log_to_console=False,
         )
+
+        if skip_prediction:
+            return result, transform
 
         # print("Image debug information after registration:")
         # print(f"Shape: {image.shape}")
@@ -72,17 +74,13 @@ class BayesianPredictor:
                             * getProbabilities(self.tissueModel, intensity)
                         )
                         pbar.update(1)
-        if save:
+        if save_path is not None:
             itk.imwrite(
                 itk.image_from_array(result),
-                os.path.join(
-                    "results",
-                    "inference",
-                    f"inferenceResult_{os.path.basename(image_path)}.nii.gz",
-                ),
+                save_path
             )
 
-        return result
+        return result, transform
 
 
 if __name__ == "__main__":
@@ -91,4 +89,4 @@ if __name__ == "__main__":
         "Par0010/Par0010affine.txt",
         training_dir="training-set",
     )
-    result = predictor.inference("test images/testing-images/1003.nii.gz")
+    result, transform = predictor.inference("test-images/testing-images/1003.nii.gz", save_path=os.path.join("results", "inference", "inference_1003.nii.gz"))
